@@ -129,7 +129,7 @@
         .stats-table td, .stats-table th { border: 1px solid #444; padding: 3px 2px; }
         .stats-table tr.current-batter { background: rgba(251, 192, 45, 0.25); font-weight: bold; border: 1px solid var(--fc-gold); }
 
-        /* ====== 🎴 放大版卡牌對決區 ====== */
+        /* ====== 🎴 經典大卡牌對決區 ====== */
         .versus-zone { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
         .player-card { 
             background: #222; 
@@ -137,7 +137,7 @@
             padding: 8px; 
             text-align: center; 
             font-size: 0.9rem; 
-            height: 280px; 
+            height: 310px; /* 拉高大卡牌，容納完美比例的圖片 */
             display: flex;
             flex-direction: column;
             justify-content: space-between;
@@ -146,13 +146,13 @@
         .player-card.atk { border-color: var(--fc-gold); background: linear-gradient(180deg, #2a2005 0%, #111 100%); }
         .player-card.def { border-color: #00ff66; background: linear-gradient(180deg, #05260f 0%, #111 100%); }
         
-        /* 修正後的精確 Sprite 視窗：確保 7x3 卡牌網格等比縮放不吃邊 */
+        /* 💡 修正寬度過寬與溢出：固定獨立卡片尺寸，背景設為 700% 300% */
         .sprite-window { 
-            width: 100%; 
-            aspect-ratio: 16 / 23; /* 根據中職卡牌比例微調 */
+            width: 140px; 
+            height: 200px; 
             margin: 5px auto; 
             border: 2px solid var(--fc-white); 
-            background-size: 700% 300%; /* 嚴格設定 7欄 x 3列 的放大率 */
+            background-size: 700% 300%; /* 7欄 x 3列，精確等於 21 張卡牌 */
             background-repeat: no-repeat; 
             image-rendering: pixelated; 
             background-color: #111; 
@@ -227,7 +227,6 @@
         <button class="audio-btn" id="audio-toggle" onclick="toggleAudio()">🎵 音效: 關</button>
     </div>
 
-    <!-- 場景 1：選隊 -->
     <div id="scene-select" class="scene active">
         <div class="title-screen">
             <h1>1995 中華職棒<br>【大卡牌✕真實陣容跑壘對決】</h1>
@@ -239,7 +238,6 @@
         </div>
     </div>
 
-    <!-- 場景 2：晉級宣言 -->
     <div id="scene-bracket" class="scene">
         <div class="stage-banner" id="bracket-stage-title">季後挑戰賽</div>
         <div class="vs-announcement">
@@ -252,9 +250,7 @@
         </div>
     </div>
 
-    <!-- 場景 3：主賽場 -->
     <div id="scene-match" class="scene">
-        <!-- 計分板 -->
         <div class="scoreboard" id="main-scoreboard">
             <table class="sb-table">
                 <tr class="sb-th-gold">
@@ -277,7 +273,6 @@
             </table>
         </div>
 
-        <!-- 殘壘與燈號 -->
         <div class="field-grid">
             <div class="bso-panel">
                 <div class="bso-row">B <div class="bso-dots"><div class="dot b" id="b1"></div><div class="dot b" id="b2"></div><div class="dot b" id="b3"></div></div></div>
@@ -293,7 +288,6 @@
             </div>
         </div>
 
-        <!-- 數據紀錄統計 -->
         <div class="stats-drawer">
             <div id="stats-title-text" style="color:var(--fc-gold); font-weight:bold; margin-bottom:3px; font-size:0.75rem;">📋 隊伍即時紀錄統計</div>
             <table class="stats-table">
@@ -306,7 +300,6 @@
             </table>
         </div>
 
-        <!-- 🎴 經典放大版對決卡牌區 -->
         <div class="versus-zone">
             <div class="player-card atk">
                 <div id="card-atk-title" style="color:var(--fc-gold); font-weight:bold; font-size:0.75rem;">打擊方</div>
@@ -322,7 +315,6 @@
             </div>
         </div>
 
-        <!-- 🏃‍♂️ 實時衝刺跑壘現場 -->
         <div class="running-arena">
             <div style="font-size:0.75rem; color:var(--fc-gold); font-weight:bold; margin-bottom:2px;">🏃‍♂️ 實時衝刺跑壘現場 (RUNNING DECISION)</div>
             <div class="track-container">
@@ -341,17 +333,14 @@
             </div>
         </div>
 
-        <!-- 廣播對話盒 -->
         <div class="log-console" id="log-box">[廣播] 歡迎收看1995年中華職棒六年賽事！</div>
 
-        <!-- 備份進度 -->
         <div class="save-load-zone">
             <div class="file-btn" onclick="exportJSON()">💾 備份進度</div>
             <label class="file-btn" for="file-input">📂 還原進度</label>
             <input type="file" id="file-input" accept=".json" onchange="importJSON(event)">
         </div>
 
-        <!-- 大按鈕 -->
         <div class="action-zone">
             <button class="btn-main" id="main-action-btn" onclick="playBall()">⚡ 揮棒揮擊・強攻對決 ⚡</button>
         </div>
@@ -359,23 +348,22 @@
 </div>
 
 <script>
-    // 使用上傳的兩張精美點陣圖檔（綠色隊伍/紅色隊伍圖集）
-    const RED_TEAM_IMG = "https://images.squarespace-cdn.com/content/v1/6213c340413009315f018e61/ccbc2783-fe02-4f60-9ba1-19e917df9198/red_team.jpg";
-    const GREEN_TEAM_IMG = "https://images.squarespace-cdn.com/content/v1/6213c340413009315f018e61/ff47d34b-b384-4860-93a8-444cbba40244/green_team.jpg";
+    // 💡 修正：使用您剛才上傳的正確本機圖檔檔名
+    const RED_TEAM_IMG = "red_team_sprites.png";
+    const GREEN_TEAM_IMG = "green_team_sprites.png";
 
-    // 映射表：將賽事實際發生的攻守狀況，精確對應到圖集裡對應卡號 (1~22)
-    // 扣除卡號1，因為卡號是從 1 到 22，網格坐標為 (卡號 - 1)
+    // 映射表：將賽事狀況精確對應到 7x3 圖集裡的對應卡號 (1~22)
     const cardMap = {
-        "ready_pitcher": 11, // RHP PITCHER 11 (投手常規)
-        "action_pitcher": 12, // PITCHER 12 (全力投球)
-        "relief_pitcher": 20, // RELIEF PITCHER 20 (救援亮相)
-        "ready_batter": 9,   // BATTER 9 (標準待擊姿勢)
-        "swing_batter": 8,   // BATTER 8 (大棒揮擊、打擊出去)
-        "hit_success": 16,   // BATTER 16 (擊出安打拔腿奔跑)
-        "hit_joy": 18,       // CLOZER 18 (擊出再見安打、全壘打大振臂高呼)
-        "fielder_catch": 10, // CENTER FIELDER 10 (外野飛撲/跳躍接球)
-        "fielder_throw": 4,  // SECOND BASEMAN 4 (接到球雷射肩迅速傳球)
-        "runner_slide": 22   // UTILITY PLAYER 22 (壘包前極速滑壘)
+        "ready_pitcher": 11,  // 投手準備
+        "action_pitcher": 12, // 投手投球
+        "relief_pitcher": 20, // 救援亮相
+        "ready_batter": 9,    // 打者待擊
+        "swing_batter": 8,    // 揮棒擊球
+        "hit_success": 16,    // 擊出安打奔跑
+        "hit_joy": 18,        // 慶祝全壘打
+        "fielder_catch": 10,  // 接殺/飛撲
+        "fielder_throw": 4,   // 雷射肩回傳球
+        "runner_slide": 22    // 極速滑壘
     };
 
     const teamDatabase = {
@@ -495,12 +483,11 @@
         if (isAudioOn) startDynamicBGM();
     }
 
-    // 精確切換網格卡牌動態位置：完美符合 7 欄 × 3 列
+    // 精確切換網格卡牌位置：完美扣合 7 欄 × 3 列，不再吃邊
     function setSpriteByCardId(element, imgUrl, cardId) {
-        const index = cardId - 1; // 轉為 0-based index
+        const index = cardId - 1; // 轉為 0-based
         const col = index % 7; 
         const row = Math.floor(index / 7);
-        // 7個格子有6個間隔，3個格子有2個間隔
         element.style.backgroundImage = `url('${imgUrl}')`;
         element.style.backgroundPosition = `${(col / 6) * 100}% ${(row / 2) * 100}%`;
     }
@@ -523,7 +510,7 @@
         document.getElementById('run-name-batter').innerText = "-";
     }
 
-    // 狀態機常態 UI 更新
+    // 常態更新 UI
     function updateUI(customBatState = "ready_batter", customPitState = "ready_pitcher") {
         document.getElementById('total-r-red').innerText = game.scoreRed;
         document.getElementById('total-h-red').innerText = game.hitsRed;
@@ -550,7 +537,6 @@
         const currentOrderIndex = game.batIndex % 9;
 
         if (game.isTop) {
-            // 先攻：玩家打擊(紅隊) VS 電腦投球(綠隊)
             setSpriteByCardId(bSprite, RED_TEAM_IMG, cardMap[customBatState]);
             setSpriteByCardId(pSprite, GREEN_TEAM_IMG, cardMap[customPitState]);
             document.getElementById('card-atk-title').innerText = `${game.redSchool} (攻)`;
@@ -559,7 +545,6 @@
             document.getElementById('card-bat-order').innerText = `${playerStats[currentOrderIndex].order}棒`;
             document.getElementById('card-pit-name').innerText = teamDatabase[game.greenSchool].pitcher;
         } else {
-            // 後攻：電腦打擊(綠隊) VS 玩家投球(紅隊)
             setSpriteByCardId(bSprite, GREEN_TEAM_IMG, cardMap[customBatState]);
             setSpriteByCardId(pSprite, RED_TEAM_IMG, cardMap[customPitState]);
             document.getElementById('card-atk-title').innerText = `${game.greenSchool} (攻)`;
@@ -576,15 +561,15 @@
         box.scrollTop = box.scrollHeight;
     }
 
-    // ====== 🏃‍♂️ 實時衝刺跑壘與回傳球觸殺動畫 (精確結合圖檔狀態) ======
+    // ====== 🏃‍♂️ 實時衝刺跑壘現場 (動畫連動) ======
     function triggerRunningBattleAnimation(batterName, hitType, baseAdvanceNum) {
         const btn = document.getElementById('main-action-btn');
         btn.disabled = true; 
         
         document.getElementById('run-name-batter').innerText = batterName;
-        document.getElementById('run-name-fielder').innerText = game.isTop ? `${game.greenSchool}雷射肩回傳` : `${game.redSchool}雷射肩回傳`;
+        document.getElementById('run-name-fielder').innerText = game.isTop ? `${game.greenSchool}外野傳球` : `${game.redSchool}外野傳球`;
 
-        // 跑壘決鬥當下：打者切換為「衝刺跑壘卡片16」，防守方切換為「野手傳球卡片4」
+        // 動態變更卡牌狀態：打者跑壘(16)，防守野手雷射肩回傳(4)
         updateUI("hit-success", "fielder_throw");
 
         const rBatter = document.getElementById('runner-p1');
@@ -611,7 +596,7 @@
                     log(`[裁判] 🟢 SAFE！跑者滑壘成功，安全抵達壘包！`);
                     if(isAudioOn) playTone(659, 'square', 0.15);
                     
-                    // 成功滑壘：打擊方切換為「滑壘卡牌22」
+                    // 滑壘成功狀態(22)
                     updateUI("runner_slide", "fielder_catch");
 
                     if (game.isTop) { game.hitsRed++; playerStats[game.batIndex % 9].h++; } 
@@ -621,7 +606,7 @@
                     log(`[裁判] ❌ OUT！外野雷射肩精準回傳，防守觸殺成功！`);
                     if(isAudioOn) playTone(180, 'square', 0.3);
                     
-                    // 被觸殺：防守方切換為「觸殺/接球成功卡牌10」
+                    // 觸殺出局狀態
                     updateUI("ready_batter", "fielder_catch");
                     game.outs++;
                 }
@@ -629,7 +614,7 @@
                 setTimeout(() => {
                     if (!game.isOver) game.batIndex = (game.batIndex + 1);
                     if (game.outs >= 3) { log(`[交換] 三出局！攻守互換。`); switchInning(); }
-                    updateUI("ready_batter", "ready_pitcher"); // 回歸常態姿勢
+                    updateUI("ready_batter", "ready_pitcher"); 
                     if (!game.isOver) btn.disabled = false;
                 }, 1000);
             }
@@ -685,7 +670,7 @@
 
         if (game.isTop) playerStats[currentOrderIndex].pa++;
 
-        // 揮棒對決瞬間：動畫切換為「投手投球12」與「打者大棒揮擊8」
+        // 投球與打擊對決：切換為投手投球(12)與大棒揮擊(8)
         updateUI("swing_batter", "action_pitcher");
 
         setTimeout(() => {
@@ -731,7 +716,7 @@
                         log(`[全壘打] ☄️💥 本壘打！球不回頭直接飛出了看台！！`); 
                         triggerVisualFx("全壘打!!");
                         
-                        // 全壘打歡慶：打者切換為「振臂高呼歡慶卡牌18」
+                        // 全壘打慶祝(18)
                         updateUI("hit_joy", "ready_pitcher");
 
                         if (game.isTop) { game.hitsRed++; playerStats[currentOrderIndex].h++; playerStats[currentOrderIndex].hr++; } 
@@ -746,7 +731,7 @@
                     }
                 }
             }
-        }, 300); // 揮棒動作短暫延遲後判定，營造打擊節奏感
+        }, 300);
     }
 
     function endMatch() {
@@ -769,7 +754,7 @@
                     document.getElementById('main-action-btn').onclick = playBall;
                 };
             } else {
-                log(`[🏆金冠軍] 漫天橘綠彩帶飛揚！${tournament.playerSchool} 勇奪職棒六年年度總冠軍金冠軍！`);
+                log(`[🏆金冠軍] 漫天彩帶飛揚！${tournament.playerSchool} 勇奪職棒六年最高榮譽金冠軍！`);
                 document.getElementById('main-action-btn').innerText = "🏆 稱霸職棒總冠軍！";
                 document.getElementById('main-action-btn').disabled = true;
             }
