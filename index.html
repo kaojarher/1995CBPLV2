@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>1995職棒大聯盟：紅綠圖檔卡牌跑壘版</title>
+    <style>
+        :root {
+            --fc-black: #000000;
+            --fc-white: #ffffff;
+            --fc-red: #da251d;       
+            --fc-gold: #fbc02d;      
+            --fc-green: #2e7d32;
+            --fc-screen-bg: #004411;  
+            --fc-soil: #5d4037;       
+            
+            /* 模擬點陣街機底層掃描線與顆粒效果 */
+            --bg-scanlines: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.03), rgba(0, 255, 0, 0.01), rgba(0, 0, 255, 0.03));
+        }
+        * {
+            box-sizing: border-box;
+            font-family: 'Courier New', 'Courier', 'Impact', "Microsoft JhengHei", sans-serif;
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            user-select: none; 
+        }
+        body {
+            background-color: var(--fc-black);
+            color: var(--fc-white);
+            margin: 0;
+            padding: 10px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+        .game-wrapper {
+            width: 100%;
+            max-width: 480px; 
+            background: #111111;
+            border: 4px double var(--fc-white);
+            padding: 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            position: relative;
+            box-shadow: 0 0 20px rgba(0,255,0,0.2);
+        }
+
+        /* 場景切換 */
+        .scene { display: none; }
+        .scene.active { display: flex; flex-direction: column; gap: 10px; }
+
+        /* 標題與選隊 */
+        .title-screen { text-align: center; padding: 10px 0; border-bottom: 2px dashed #444; }
+        .title-screen h1 { color: var(--fc-gold); font-size: 1.5rem; margin: 0 0 5px 0; text-shadow: 2px 2px #ff0000; letter-spacing: 2px; }
+        .team-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 10px 0; }
+        .team-btn { background: #222; color: #fff; border: 2px solid #444; padding: 12px; font-size: 1rem; font-weight: bold; cursor: pointer; }
+        .team-btn.selected { background: var(--fc-red); border-color: var(--fc-gold); color: var(--fc-white); box-shadow: inset 0 0 10px var(--fc-gold); }
+
+        /* 計分板 */
+        .scoreboard { background-color: var(--fc-screen-bg); border: 2px solid var(--fc-white); padding: 5px; font-size: 0.8rem; }
+        .sb-table { width: 100%; border-collapse: collapse; text-align: center; }
+        .sb-table th, .sb-table td { padding: 4px 2px; border: 1px solid rgba(255,255,255,0.2); }
+        
+        /* 戰術板與靜態壘包 */
+        .field-grid { display: grid; grid-template-columns: 1.2fr 1fr; gap: 8px; background: #0c2b06; padding: 8px; border: 2px solid var(--fc-white); }
+        .bso-panel { display: flex; flex-direction: column; justify-content: center; gap: 4px; background: rgba(0,0,0,0.6); padding: 6px; border: 1px solid #555; }
+        .bso-row { display: flex; align-items: center; gap: 8px; font-weight: bold; font-size: 0.9rem;}
+        .bso-dots { display: flex; gap: 4px; }
+        .dot { width: 14px; height: 14px; border-radius: 50%; background: #222; border: 1px solid #777;}
+        .dot.b.active { background: #00ff00; box-shadow: 0 0 6px #00ff00; }
+        .dot.s.active { background: #00ffff; box-shadow: 0 0 6px #00ffff; }
+        .dot.o.active { background: #ff0000; box-shadow: 0 0 6px #ff0000; }
+        
+        .diamond-box { display: flex; justify-content: center; align-items: center; background: var(--fc-soil); height: 85px; }
+        .diamond { width: 52px; height: 52px; border: 1px dashed rgba(255,255,255,0.5); transform: rotate(45deg); position: relative; }
+        .base { position: absolute; width: 12px; height: 12px; background: var(--fc-white); transform: rotate(-45deg); border: 1px solid #000; }
+        .base.active { background: var(--fc-gold); box-shadow: 0 0 8px var(--fc-gold); }
+        .base-1 { top: -6px; right: -6px; }
+        .base-2 { top: -6px; left: -6px; }
+        .base-3 { bottom: -6px; left: -6px; }
+
+        /* ====== 🎴 1995 CBPL 動態對戰卡牌區 (支援指定圖檔) ====== */
+        .versus-zone { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 5px 0; }
+        .cbpl-card {
+            background: #151515;
+            border: 4px solid #fff;
+            padding: 6px;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            height: 185px;
+            box-shadow: 4px 4px 0px rgba(255,255,255,0.2);
+            overflow: hidden;
+        }
+
+        /* 依據陣營動態更換卡牌邊框 */
+        .cbpl-card.theme-red { border-color: var(--fc-red); }
+        .cbpl-card.theme-green { border-color: var(--fc-green); }
+        .cbpl-card.theme-gold { border-color: var(--fc-gold); }
+
+        /* 點陣插圖區：完美綁定指定圖檔檔名並搭配 fallback 像素混合樣式 */
+        .pixel-art-avatar {
+            width: 100%;
+            height: 65px;
+            background-color: #222;
+            background-position: center;
+            background-size: dashed;
+            background-repeat: no-repeat;
+            margin: 4px 0;
+            border: 2px solid rgba(255,255,255,0.2);
+            position: relative;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        /* 重疊街機電視掃描線濾鏡 */
+        .pixel-art-avatar::after {
+            content: "";
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background-image: var(--bg-scanlines);
+            background-size: 100% 4px;
+            pointer-events: none;
+        }
+
+        .pixel-badge {
+            font-size: 24px;
+            text-shadow: 2px 2px #000;
+            z-index: 2;
+            animation: pulse 1s infinite alternate;
+        }
+        @keyframes pulse { from { transform: scale(0.92); } to { transform: scale(1.08); } }
+
+        .card-header { display: flex; justify-content: space-between; font-size: 9px; color: #ccc; border-bottom: 1px solid rgba(255,255,255,0.2); padding-bottom: 2px;}
+        .card-title { font-size: 1.15rem; font-weight: bold; color: #fff; margin: 2px 0; text-align: center; text-shadow: 1px 1px #000; }
+        .card-body-data { background: rgba(0, 0, 0, 0.6); padding: 4px; font-size: 10px; border: 1px dashed #666; }
+        .data-row { display: flex; justify-content: space-between; margin-bottom: 1px; }
+        .card-footer-team { font-size: 10px; text-align: right; font-weight: bold; margin-top: 2px; }
+
+        /* ====== 🏃‍♀️ 實時動態跑壘賽道區域 ====== */
+        .running-arena { background: #222; border: 2px solid var(--fc-white); padding: 8px; }
+        .track-container { background: #3e2723; padding: 8px; position: relative; width: 100%; height: 110px; border: 2px solid #27120c; overflow: hidden; }
+        .lane-path { height: 40px; margin-bottom: 6px; background: #9c27b0; position: relative; border-bottom: 2px dashed rgba(255,255,255,0.3); }
+        .lane-path:last-child { margin-bottom: 0; background: #009688; }
+        .lane-label { position: absolute; left: 5px; top: 2px; font-size: 9px; background: rgba(0,0,0,0.7); padding: 1px 4px; z-index: 2; }
+        .runner-sprite { position: absolute; left: 0%; top: 6px; transition: left 0.08s linear; display: flex; align-items: center; gap: 4px; z-index: 5; }
+        .runner-avatar { width: 26px; height: 26px; background: var(--fc-gold); border: 2px solid #fff; color: #000; font-size: 14px; font-weight: bold; display: flex; align-items: center; justify-content: center; }
+        .runner-name { font-size: 11px; background: #000; border: 1px solid var(--fc-gold); padding: 1px 4px; white-space: nowrap; }
+
+        /* 即時廣播 */
+        .log-console { background: #000; border: 2px solid var(--fc-white); height: 75px; overflow-y: auto; padding: 6px; font-size: 0.8rem; line-height: 1.4; color: #00ff00; }
+
+        /* 存檔系統 */
+        .save-load-zone { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; border: 1px dashed #555; padding: 6px; font-size: 0.75rem; }
+        .file-btn { background: #222; color: #fff; border: 1px solid #888; padding: 6px; text-align: center; cursor: pointer; font-weight: bold;}
+        #file-input { display: none; }
+
+        /* 揮棒大鈕 */
+        .btn-main { width: 100%; padding: 15px; font-size: 1.25rem; font-weight: bold; background: linear-gradient(180deg, #da251d, #800000); color: var(--fc-white); border: 2px solid var(--fc-white); cursor: pointer; text-shadow: 1px 1px #000; }
+        .btn-main:disabled { background: #444; border-color: #777; color: #888; cursor: not-allowed; }
+        
+        .top-bar { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #fff; padding-bottom: 5px; font-size: 0.85rem;}
+        .audio-btn { background: #222; color: var(--fc-white); border: 1px solid #fff; font-size: 0.75rem; padding: 2px 8px; cursor: pointer; }
+    </style>
+</head>
+<body>
+
+<div class="game-wrapper">
+    <div class="top-bar">
+        <span style="color:var(--fc-gold); font-weight:bold;">⚾ 1995 CBPL：復古圖檔跑壘手遊</span>
+        <button class="audio-btn" id="audio-toggle" onclick="toggleAudio()">🎵 音效: 關</button>
+    </div>
+
+    <div id="scene-select" class="scene active">
+        <div class="title-screen">
+            <h1>1995 中華職棒大聯盟</h1>
+            <p style="font-size:0.75rem; color:#ffcc00; margin:0;">[動態加載紅綠圖檔卡牌與實時跑壘推進]</p>
+        </div>
+        
+        <div class="save-load-zone">
+            <div class="file-btn" onclick="exportJSON()">📥 備份匯出存檔</div>
+            <label class="file-btn" for="file-input">📤 還原匯入存檔</label>
+            <input type="file" id="file-input" accept=".json" onchange="importJSON(event)">
+        </div>
+
+        <div class="team-grid" id="select-team-grid"></div>
+        
+        <div class="action-zone">
+            <button class="btn-main" onclick="confirmTeam()">決定球隊・進入球場 (PLAY BALL)</button>
+        </div>
+    </div>
+
+    <div id="scene-match" class="scene">
+        <div class="scoreboard">
+            <table class="sb-table">
+                <tr style="color:var(--fc-gold); font-weight:bold;">
+                    <th style="text-align:left; width:60px;">TEAM</th><th>1~3</th><th>4~6</th><th>7~9</th><th>R</th><th>H</th>
+                </tr>
+                <tr>
+                    <td id="sb-name-player" style="color:#ffcc00; font-weight:bold;">玩家</td>
+                    <td id="r-p1">-</td><td id="r-p2">-</td><td id="r-p3">-</td>
+                    <td style="color:var(--fc-gold); font-weight:bold;" id="total-r-p">0</td><td id="total-h-p">0</td>
+                </tr>
+                <tr>
+                    <td id="sb-name-cpu" style="color:#00ff66; font-weight:bold;">電腦</td>
+                    <td id="r-c1">-</td><td id="r-c2">-</td><td id="r-c3">-</td>
+                    <td style="color:var(--fc-gold); font-weight:bold;" id="total-r-c">0</td><td id="total-h-c">0</td>
+                </tr>
+            </table>
+        </div>
+
+        <div class="field-grid">
+            <div class="bso-panel">
+                <div class="bso-row">B <div class="bso-dots"><div class="dot b" id="b1"></div><div class="dot b" id="b2"></div></div></div>
+                <div class="bso-row">S <div class="bso-dots"><div class="dot s" id="s1"></div><div class="dot s" id="s2"></div></div></div>
+                <div class="bso-row">O <div class="bso-dots"><div class="dot o" id="o1"></div><div class="dot o" id="o2"></div></div></div>
+            </div>
+            <div class="diamond-box">
+                <div class="diamond">
+                    <div class="base base-1" id="base-1"></div>
+                    <div class="base base-2" id="base-2"></div>
+                    <div class="base base-3" id="base-3"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="versus-zone">
+            <div class="cbpl-card" id="card-batter">
+                <div class="card-header"><span id="c-bat-pos">守位: CF</span><span>BATTER</span></div>
+                <div class="pixel-art-avatar" id="c-bat-img-box"><div class="pixel-badge" id="c-bat-badge">🏃</div></div>
+                <div class="card-title" id="c-bat-name">-</div>
+                <div class="card-body-data">
+                    <div class="data-row"><span>打擊率:</span><span id="c-bat-avg">.000</span></div>
+                    <div class="data-row"><span>速度評等:</span><span id="c-bat-spd">C</span></div>
+                </div>
+                <div class="card-footer-team" id="c-bat-team">-</div>
+            </div>
+
+            <div class="cbpl-card" id="card-pitcher">
+                <div class="card-header"><span>守位: P</span><span>PITCHER</span></div>
+                <div class="pixel-art-avatar" id="c-pit-img-box"><div class="pixel-badge" id="c-pit-badge">🔥</div></div>
+                <div class="card-title" id="c-pitcher-name">-</div>
+                <div class="card-body-data">
+                    <div class="data-row"><span>防禦率:</span><span id="c-pit-era">0.00</span></div>
+                    <div class="data-row"><span>王牌球速:</span><span id="c-pit-vel">140km</span></div>
+                </div>
+                <div class="card-footer-team" id="c-pitcher-team">-</div>
+            </div>
+        </div>
+
+        <div class="running-arena">
+            <div class="track-container">
+                <div class="lane-path">
+                    <div class="lane-label">🏃 衝刺跑者 (RUNNER)</div>
+                    <div class="runner-sprite" id="runner-p1">
+                        <div class="runner-avatar">🏃</div><div class="runner-name" id="run-name-batter">-</div>
+                    </div>
+                </div>
+                <div class="lane-path">
+                    <div class="lane-label">⚾ 外野回傳球 (FIELDING)</div>
+                    <div class="runner-sprite" id="runner-cpu">
+                        <div class="runner-avatar" style="background:#da251d;">⚾</div><div class="runner-name">雷射肩回傳</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="log-console" id="log-box">[廣播] 1995 圖檔對決準備就緒！</div>
+
+        <div class="action-zone">
+            <button class="btn-main" id="main-action-btn" onclick="handlePitchAndBat()">⚡ 揮棒擊球 (SWING) ⚡</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    // 依據球隊屬性對應到您指定的 green_team_sprites.png 與 red_team_sprites.png
+    const teamDatabase = {
+        "兄弟象": { 
+            pitcher: "陳義信", era: "2.71", vel: "144km", theme: "theme-gold", spriteFile: "green_team_sprites.png", badge: "🐯",
+            batters: [
+                { name: "林易增", pos: "CF", avg: ".295", spd: "A+", badge: "🏃" },
+                { name: "吳復連", pos: "2B", avg: ".272", spd: "B", badge: "蝙" },
+                { name: "路易士", pos: "3B", avg: ".341", spd: "B-", badge: "強" },
+                { name: "王光輝", pos: "1B", avg: ".302", spd: "C+", badge: "王" },
+                { name: "葛雷諾", pos: "SS", avg: ".318", spd: "A", badge: "閃" }
+            ]
+        },
+        "統一獅": { 
+            pitcher: "王漢", era: "2.35", vel: "146km", theme: "theme-green", spriteFile: "green_team_sprites.png", badge: "🦁",
+            batters: [
+                { name: "賀亮德", pos: "CF", avg: ".310", spd: "S", badge: "飛" },
+                { name: "羅敏卿", pos: "DH", avg: ".298", spd: "D", badge: "轟" },
+                { name: "曾智偵", pos: "C",  avg: ".276", spd: "C+", badge: "盾" },
+                { name: "卡羅",   pos: "SS", avg: ".288", spd: "A", badge: "鷹" }
+            ]
+        },
+        "味全龍": { 
+            pitcher: "黃平洋", era: "3.12", vel: "141km", theme: "theme-red", spriteFile: "red_team_sprites.png", badge: "🐲",
+            batters: [
+                { name: "大帝士", pos: "SS", avg: ".282", spd: "S+", badge: "豹" },
+                { name: "孫昭立", pos: "LF", avg: ".275", spd: "B", badge: "箭" },
+                { name: "坎沙諾", pos: "CF", avg: ".315", spd: "A", badge: "龍" }
+            ]
+        },
+        "時報鷹": { 
+            pitcher: "郭建成", era: "3.42", vel: "143km", theme: "theme-red", spriteFile: "red_team_sprites.png", badge: "🦅",
+            batters: [
+                { name: "曾貴章", pos: "LF", avg: ".311", spd: "A", badge: "帥" },
+                { name: "哥雅",   pos: "CF", avg: ".323", spd: "A", badge: "準" },
+                { name: "廖敏雄", pos: "DH", avg: ".292", spd: "C+", badge: "俠" }
+            ]
+        }
+    };
+
+    let gameState = {
+        playerTeam: "兄弟象", cpuTeam: "味全龍",
+        score: { player: 0, cpu: 0, playerHits: 0, cpuHits: 0 },
+        inning: 1, isPlayerAtk: true, balls: 0, strikes: 0, outs: 0,
+        bases: [false, false, false], batterIndex: 0, cpuBatterIndex: 0
+    };
+
+    let audioCtx = null; let isAudioOn = false;
+
+    window.onload = function() { initSelectScreen(); };
+
+    function toggleAudio() {
+        if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        isAudioOn = !isAudioOn;
+        document.getElementById('audio-toggle').innerText = isAudioOn ? "🎵 音效: 開 🔊" : "🎵 音效: 關 🔇";
+    }
+
+    function playBeep(freq, duration) {
+        if (!isAudioOn || !audioCtx) return;
+        const osc = audioCtx.createOscillator(); const gain = audioCtx.createGain();
+        osc.type = 'square'; osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+        gain.gain.setValueAtTime(0.03, audioCtx.currentTime);
+        osc.connect(gain); gain.connect(audioCtx.destination);
+        osc.start(); osc.stop(audioCtx.currentTime + duration);
+    }
+
+    function initSelectScreen() {
+        const grid = document.getElementById('select-team-grid');
+        grid.innerHTML = "";
+        Object.keys(teamDatabase).forEach((tName, idx) => {
+            const btn = document.createElement('button');
+            btn.className = `team-btn ${idx === 0 ? 'selected' : ''}`;
+            btn.innerText = tName;
+            btn.onclick = () => {
+                document.querySelectorAll('.team-btn').forEach(b => b.classList.remove('selected'));
+                btn.classList.add('selected');
+                gameState.playerTeam = tName;
+            };
+            grid.appendChild(btn);
+        });
+    }
+
+    function confirmTeam() {
+        if (gameState.playerTeam === gameState.cpuTeam) {
+            const teams = Object.keys(teamDatabase);
+            gameState.cpuTeam = teams.find(t => t !== gameState.playerTeam);
+        }
+        document.getElementById('sb-name-player').innerText = gameState.playerTeam.slice(0,3);
+        document.getElementById('sb-name-cpu').innerText = gameState.cpuTeam.slice(0,3);
+        document.getElementById('scene-select').classList.remove('active');
+        document.getElementById('scene-match').classList.add('active');
+        log(`[開賽] ${gameState.playerTeam} 主場出擊對決 ${gameState.cpuTeam}！`);
+        updateUI();
+    }
+
+    // 將圖檔載入邏輯與UI完美融合
+    function updateUI() {
+        const pTeamData = teamDatabase[gameState.playerTeam];
+        const cTeamData = teamDatabase[gameState.cpuTeam];
+        
+        let currentBatter, currentPitcher, atkTeamName, defTeamName, atkTheme, defTheme, atkFile, defFile;
+
+        if (gameState.isPlayerAtk) {
+            currentBatter = pTeamData.batters[gameState.batterIndex % pTeamData.batters.length];
+            currentPitcher = cTeamData;
+            atkTeamName = gameState.playerTeam; defTeamName = gameState.cpuTeam;
+            atkTheme = pTeamData.theme; defTheme = cTeamData.theme;
+            atkFile = pTeamData.spriteFile; defFile = cTeamData.spriteFile;
+        } else {
+            currentBatter = cTeamData.batters[gameState.cpuBatterIndex % cTeamData.batters.length];
+            currentPitcher = pTeamData;
+            atkTeamName = gameState.cpuTeam; defTeamName = gameState.playerTeam;
+            atkTheme = cTeamData.theme; defTheme = pTeamData.theme;
+            atkFile = cTeamData.spriteFile; defFile = pTeamData.spriteFile;
+        }
+
+        // 🎴 渲染打者卡牌：引入對應圖檔並設定復古 fallback 背景色
+        const bCard = document.getElementById('card-batter');
+        bCard.className = `cbpl-card ${atkTheme}`;
+        
+        const bImgBox = document.getElementById('c-bat-img-box');
+        bImgBox.style.backgroundImage = `url('${atkFile}')`;
+        bImgBox.style.backgroundBlendMode = 'overlay';
+        // 若找不到圖檔則由以下底色補貼像素氛圍
+        bImgBox.style.backgroundColor = atkTheme === 'theme-red' ? '#500b0b' : (atkTheme === 'theme-green' ? '#0b4012' : '#473d0a');
+
+        document.getElementById('c-bat-name').innerText = currentBatter.name;
+        document.getElementById('c-bat-pos').innerText = `守位: ${currentBatter.pos}`;
+        document.getElementById('c-bat-avg').innerText = currentBatter.avg;
+        document.getElementById('c-bat-spd').innerText = currentBatter.spd;
+        document.getElementById('c-bat-team').innerText = atkTeamName;
+        document.getElementById('c-bat-badge').innerText = currentBatter.badge;
+
+        // 🎴 渲染投手卡牌：引入對應圖檔並設定復古 fallback 背景色
+        const pCard = document.getElementById('card-pitcher');
+        pCard.className = `cbpl-card ${defTheme}`;
+        
+        const pImgBox = document.getElementById('c-pit-img-box');
+        pImgBox.style.backgroundImage = `url('${defFile}')`;
+        pImgBox.style.backgroundBlendMode = 'overlay';
+        pImgBox.style.backgroundColor = defTheme === 'theme-red' ? '#500b0b' : (defTheme === 'theme-green' ? '#0b4012' : '#473d0a');
+
+        document.getElementById('c-pitcher-name').innerText = currentPitcher.pitcher;
+        document.getElementById('c-pit-era').innerText = currentPitcher.era;
+        document.getElementById('c-pit-vel').innerText = currentPitcher.vel;
+        document.getElementById('c-pitcher-team').innerText = defTeamName;
+        document.getElementById('c-pit-badge').innerText = currentPitcher.badge;
+
+        // 更新燈號、壘包狀態與比分
+        updateDots('b', gameState.balls, 2); updateDots('s', gameState.strikes, 2); updateDots('o', gameState.outs, 2);
+        document.getElementById('base-1').className = `base base-1 ${gameState.bases[0] ? 'active' : ''}`;
+        document.getElementById('base-2').className = `base base-2 ${gameState.bases[1] ? 'active' : ''}`;
+        document.getElementById('base-3').className = `base base-3 ${gameState.bases[2] ? 'active' : ''}`;
+        document.getElementById('total-r-p').innerText = gameState.score.player;
+        document.getElementById('total-h-p').innerText = gameState.score.playerHits;
+        document.getElementById('total-r-c').innerText = gameState.score.cpu;
+        document.getElementById('total-h-c').innerText = gameState.score.cpuHits;
+        document.getElementById('r-p1').innerText = gameState.score.player;
+        document.getElementById('r-c1').innerText = gameState.score.cpu;
+    }
+
+    function updateDots(type, count, max) {
+        for (let i = 1; i <= max; i++) {
+            const dot = document.getElementById(`${type}${i}`);
+            if (dot) dot.classList.toggle('active', i <= count);
+        }
+    }
+
+    function log(msg) {
+        const box = document.getElementById('log-box'); box.innerHTML += `<div>${msg}</div>`;
+        box.scrollTop = box.scrollHeight;
+    }
+
+    function handlePitchAndBat() {
+        const btn = document.getElementById('main-action-btn'); btn.disabled = true;
+        const pTeamData = teamDatabase[gameState.playerTeam]; const cTeamData = teamDatabase[gameState.cpuTeam];
+        const activeBatter = gameState.isPlayerAtk ? 
+            pTeamData.batters[gameState.batterIndex % pTeamData.batters.length] : cTeamData.batters[gameState.cpuBatterIndex % cTeamData.batters.length];
+
+        const rand = Math.random();
+        if (rand < 0.42) {
+            document.getElementById('run-name-batter').innerText = activeBatter.name;
+            log(`[打擊] 💥 鏘！${activeBatter.name} 敲出中外野安打！`);
+            playBeep(880, 0.1);
+            triggerLiveRunningAnimation(activeBatter.spd, () => {
+                handleHitSuccess(); btn.disabled = false;
+            });
+        } else if (rand < 0.72) {
+            gameState.strikes++; log(`[好球] 投手施展變化球，打者揮棒落空！`);
+            playBeep(400, 0.08);
+            if (gameState.strikes >= 3) {
+                log(`[裁判] 三振出局！`); gameState.outs++; clearBS();
+            }
+            checkInningOver(); btn.disabled = false; updateUI();
+        } else {
+            if (Math.random() > 0.5) {
+                gameState.balls++; log(`[壞球] 偏離好球帶。`);
+                if (gameState.balls >= 4) {
+                    log(`[保送] 四壞球保送上壘。`); advanceBases(1); clearBS();
+                }
+            } else {
+                log(`[守備] 擊出高飛球被游擊手精準接殺。`);
+                playBeep(300, 0.12); gameState.outs++; clearBS();
+            }
+            checkInningOver(); btn.disabled = false; updateUI();
+        }
+    }
+
+    function triggerLiveRunningAnimation(spdRating, callback) {
+        const rBatter = document.getElementById('runner-p1'); const rCpu = document.getElementById('runner-cpu');
+        let pPos = 0; let cPos = 0;
+        let speedBonus = 2.0;
+        if (spdRating.includes('S')) speedBonus = 3.3;
+        else if (spdRating.includes('A')) speedBonus = 2.7;
+        else if (spdRating.includes('B')) speedBonus = 2.1;
+
+        let pSpeed = speedBonus + Math.random() * 1.5;
+        let cSpeed = 2.5 + Math.random() * 2.2;
+        rBatter.style.left = "0%"; rCpu.style.left = "0%";
+
+        const runInterval = setInterval(() => {
+            pPos += pSpeed;
+            if (pPos > 12) cPos += cSpeed;
+            rBatter.style.left = `${Math.min(pPos, 88)}%`;
+            rCpu.style.left = `${Math.min(cPos, 88)}%`;
+
+            if (pPos >= 85 || cPos >= 85) {
+                clearInterval(runInterval);
+                if (pPos > cPos) {
+                    log(`[跑壘] 🏃‍♂️ 安全滑上壘包 (SAFE)！`); playBeep(659, 0.2);
+                } else {
+                    log(`[守備] ⚾ 雷射肩精準傳回！觸殺出局 (OUT)！`); gameState.outs++; playBeep(220, 0.25);
+                }
+                setTimeout(() => { callback(); }, 600);
+            }
+        }, 50);
+    }
+
+    function handleHitSuccess() {
+        if (gameState.isPlayerAtk) gameState.score.playerHits++; else gameState.score.cpuHits++;
+        advanceBases(1); clearBS(); checkInningOver(); updateUI();
+    }
+
+    function advanceBases(num) {
+        for (let i = 0; i < num; i++) {
+            if (gameState.bases[2]) {
+                if (gameState.isPlayerAtk) gameState.score.player++; else gameState.score.cpu++;
+                log(`[得分] 🚀 跑者繞過三壘狂奔回本壘踩盤得分！`);
+            }
+            gameState.bases[2] = gameState.bases[1]; gameState.bases[1] = gameState.bases[0]; gameState.bases[0] = true;
+        }
+    }
+
+    function clearBS() { gameState.balls = 0; gameState.strikes = 0; }
+
+    function checkInningOver() {
+        if (gameState.outs >= 3) {
+            log(`[攻守輪替] 三人出局，交換防守位置。`);
+            gameState.outs = 0; clearBS(); gameState.bases = [false, false, false];
+            if (gameState.isPlayerAtk) { gameState.isPlayerAtk = false; } 
+            else {
+                gameState.isPlayerAtk = true; gameState.inning++;
+                if (gameState.inning > 3) determineWinner();
+            }
+        }
+        if (gameState.isPlayerAtk) gameState.batterIndex++; else gameState.cpuBatterIndex++;
+    }
+
+    function determineWinner() {
+        alert(`🏆 賽事結束 🏆\n${gameState.playerTeam}: ${gameState.score.player} 分\n${gameState.cpuTeam}: ${gameState.score.cpu} 分`);
+        gameState.inning = 1; gameState.score = { player: 0, cpu: 0, playerHits: 0, cpuHits: 0 };
+        document.getElementById('scene-match').classList.remove('active');
+        document.getElementById('scene-select').classList.add('active');
+    }
+
+    // ====== 💾 JSON 歷史存檔管理機制 ======
+    function exportJSON() {
+        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(gameState, null, 2));
+        const dlAnchor = document.createElement('a'); dlAnchor.setAttribute("href", dataStr);
+        dlAnchor.setAttribute("download", `cpbl_1995_sprites_save.json`);
+        document.body.appendChild(dlAnchor); dlAnchor.click(); dlAnchor.remove();
+        log(`[系統] 📥 成功匯出專屬遊戲存檔 JSON 檔！`);
+    }
+
+    function importJSON(event) {
+        const file = event.target.files[0]; if (!file) return;
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            try {
+                const imported = JSON.parse(e.target.result);
+                if (imported.score && imported.playerTeam) {
+                    gameState = imported;
+                    document.getElementById('sb-name-player').innerText = gameState.playerTeam.slice(0,3);
+                    document.getElementById('sb-name-cpu').innerText = gameState.cpuTeam.slice(0,3);
+                    document.getElementById('scene-select').classList.remove('active');
+                    document.getElementById('scene-match').classList.add('active');
+                    updateUI(); log(`[系統] 📤 存檔載入成功！圖檔卡牌樣式已同步切換。`);
+                }
+            } catch (err) { alert("檔案讀取失敗，請確認是否為正確的 JSON 存檔。"); }
+        };
+        reader.readAsText(file);
+    }
+</script>
+</body>
+</html>
